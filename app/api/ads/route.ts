@@ -1,41 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const META_API_BASE = "https://graph.facebook.com/v21.0/ads_archive";
+import FirecrawlApp from "@mendable/firecrawl-js";
 
 export async function POST(req: NextRequest) {
   try {
-    const { companyName, pageId } = await req.json();
+    const { companyName } = await req.json();
     if (!companyName || typeof companyName !== "string") {
       return NextResponse.json({ error: "companyName is required" }, { status: 400 });
     }
 
-    const token = process.env.META_ACCESS_TOKEN;
-    if (!token) {
-      return NextResponse.json({ error: "META_ACCESS_TOKEN not configured" }, { status: 500 });
+    const apiKey = process.env.FIRECRAWL_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: "FIRECRAWL_API_KEY not configured" }, { status: 500 });
     }
 
-    const params = new URLSearchParams({
-      search_terms: companyName,
-      ad_reached_countries: JSON.stringify(["FI"]),
-      ad_active_status: "ALL",
-      fields: "ad_creative_body,ad_creative_link_title,ad_snapshot_url,impressions,page_name",
-      limit: "10",
-      access_token: token,
+    const client = new FirecrawlApp({ apiKey });
+
+    const libraryUrl = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=FI&q=${encodeURIComponent(companyName)}&search_type=keyword_unordered`;
+
+    const result = await client.scrapeUrl(libraryUrl, {
+      formats: ["markdown"],
+      waitFor: 4000,
     });
 
-    if (pageId) {
-      params.set("search_page_ids", JSON.stringify([pageId]));
+    if (!result.success || !result.markdown) {
+      return NextResponse.json({ ads: [], error: "Could not load Meta Ad Library page" }, { status: 200 });
     }
 
-    const res = await fetch(`${META_API_BASE}?${params.toString()}`);
-    const json = await res.json();
+    // Extract ad blocks from the scraped markdown
+    const markdown = result.markdown;
+    const ads: { page_name?: string; ad_creative_body?: string; ad_creative_link_title?: string }[] = [];
 
-    if (json.error) {
-      return NextResponse.json({ error: `Meta API: ${json.error.message ?? JSON.stringify(json.error)}`, ads: [] }, { status: 200 });
+    // Look for sponsored content patterns in the scraped text
+    const lines = markdown.split("\n").filter(l => l.trim());
+    let currentAd: typeof ads[0] = {};
+
+    for (const line of lines) {
+      if (line.toLowerCase().includes("sponsoroitu") || line.toLowerCase().includes("sponsored")) {
+        if (currentAd.page_name) ads.push(currentAd);
+        currentAd = {};
+      } else if (!currentAd.page_name && line.length > 2 && line.length < 80 && !line.startsWith("http")) {
+        currentAd.page_name = line.replace(/^#+\s*/, "").trim();
+      } else if (currentAd.page_name && !currentAd.ad_creative_body && line.length > 20) {
+        currentAd.ad_creative_body = line.trim();
+      }
     }
+    if (currentAd.page_name) ads.push(currentAd);
 
-    const ads = (json.data ?? []).slice(0, 5);
-    return NextResponse.json({ ads, debug: { searchTerm: companyName, total: json.data?.length ?? 0 } });
+    return NextResponse.json({ ads: ads.slice(0, 5) });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message, ads: [] }, { status: 200 });
