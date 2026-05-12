@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 
-const client = new Anthropic();
+const client = new OpenAI();
 
 const SYSTEM = `You are an expert digital advertising strategist specializing in Meta (Facebook/Instagram) ads.
 Analyze the provided website content and ad data, then return ONLY valid JSON — no markdown, no code fences.`;
@@ -28,9 +28,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "scrapedContent is required" }, { status: 400 });
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
+      return NextResponse.json({ error: "OPENAI_API_KEY not configured" }, { status: 500 });
     }
 
     const adsSection = ads && ads.length > 0
@@ -48,17 +48,16 @@ ${SCHEMA}
 
 Return ONLY the JSON object, nothing else.`;
 
-    const message = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+    const message = await client.chat.completions.create({
+      model: "gpt-4o",
       max_tokens: 1024,
-      system: SYSTEM,
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        { role: "system", content: SYSTEM },
+        { role: "user", content: prompt },
+      ],
     });
 
-    const text = message.content
-      .filter(b => b.type === "text")
-      .map(b => (b as { type: "text"; text: string }).text)
-      .join("");
+    const text = message.choices[0]?.message?.content ?? "";
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
