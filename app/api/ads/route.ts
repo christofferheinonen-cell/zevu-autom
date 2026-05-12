@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import FirecrawlApp from "@mendable/firecrawl-js";
+import { FirecrawlClient } from "@mendable/firecrawl-js";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,11 +13,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "FIRECRAWL_API_KEY not configured" }, { status: 500 });
     }
 
-    const client = new FirecrawlApp({ apiKey });
+    const client = new FirecrawlClient({ apiKey });
 
     const libraryUrl = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=FI&q=${encodeURIComponent(companyName)}&search_type=keyword_unordered`;
 
-    const result = await client.scrapeUrl(libraryUrl, {
+    const result = await client.scrape(libraryUrl, {
       formats: ["markdown"],
       waitFor: 4000,
     });
