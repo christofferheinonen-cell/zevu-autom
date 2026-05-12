@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
-
-const client = new Anthropic();
+import OpenAI from "openai";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,10 +8,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "companyName and analysis are required" }, { status: 400 });
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
+      return NextResponse.json({ error: "OPENAI_API_KEY not configured" }, { status: 500 });
     }
+
+    const client = new OpenAI({ apiKey });
 
     const topWeakness = analysis.topWeaknesses?.[0] ?? "vague messaging that doesn't convert";
     const opportunity = analysis.biggestOpportunity ?? "stronger ad creative";
@@ -36,16 +36,13 @@ Rules:
 - Return ONLY valid JSON: {"subject": "string", "body": "string"}
 - No markdown, no code fences`;
 
-    const message = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+    const response = await client.chat.completions.create({
+      model: "gpt-4o",
       max_tokens: 512,
       messages: [{ role: "user", content: prompt }],
     });
 
-    const text = message.content
-      .filter(b => b.type === "text")
-      .map(b => (b as { type: "text"; text: string }).text)
-      .join("");
+    const text = response.choices[0]?.message?.content ?? "";
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
