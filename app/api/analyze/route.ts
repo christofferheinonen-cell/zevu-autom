@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const client = new OpenAI();
-
 const SYSTEM = `You are an expert digital advertising strategist specializing in Meta (Facebook/Instagram) ads.
 Analyze the provided website content and ad data, then return ONLY valid JSON — no markdown, no code fences.`;
 
@@ -32,6 +30,8 @@ export async function POST(req: NextRequest) {
     if (!apiKey) {
       return NextResponse.json({ error: "OPENAI_API_KEY not configured" }, { status: 500 });
     }
+
+    const client = new OpenAI({ apiKey });
 
     const adsSection = ads && ads.length > 0
       ? `\n\nCurrent Meta ads found (${ads.length}):\n${JSON.stringify(ads, null, 2)}`

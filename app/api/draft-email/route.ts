@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const client = new OpenAI();
-
 export async function POST(req: NextRequest) {
   try {
     const { companyName, url, analysis, improvedAd } = await req.json();
@@ -14,6 +12,8 @@ export async function POST(req: NextRequest) {
     if (!apiKey) {
       return NextResponse.json({ error: "OPENAI_API_KEY not configured" }, { status: 500 });
     }
+
+    const client = new OpenAI({ apiKey });
 
     const topWeakness = analysis.topWeaknesses?.[0] ?? "vague messaging that doesn't convert";
     const opportunity = analysis.biggestOpportunity ?? "stronger ad creative";
