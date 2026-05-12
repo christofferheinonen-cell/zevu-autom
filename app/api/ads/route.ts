@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const META_API_BASE = "https://graph.facebook.com/v19.0/ads_archive";
+const META_API_BASE = "https://graph.facebook.com/v21.0/ads_archive";
 
 export async function POST(req: NextRequest) {
   try {
