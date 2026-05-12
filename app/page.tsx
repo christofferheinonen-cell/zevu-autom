@@ -204,11 +204,19 @@ export default function WorkflowPage() {
       return;
     }
 
+    const nameForSearch = companyName.trim() || (() => {
+      try {
+        return new URL(url.trim()).hostname.replace(/^www\./, "").split(".")[0];
+      } catch {
+        return url.trim();
+      }
+    })();
+
     /* Step 2 — Ads (non-fatal) */
     setStep("ads", "running");
     let foundAds: Ad[] = [];
     try {
-      const data = await post<{ ads: Ad[] }>("/api/ads", { companyName: companyName.trim() || url.trim() });
+      const data = await post<{ ads: Ad[] }>("/api/ads", { companyName: nameForSearch });
       foundAds = data.ads ?? [];
       setAds(foundAds);
       setStep("ads", "done");
@@ -251,7 +259,7 @@ export default function WorkflowPage() {
     setStep("email", "running");
     try {
       const data = await post<Email>("/api/draft-email", {
-        companyName: companyName.trim() || url.trim(),
+        companyName: companyName.trim() || nameForSearch,
         url: url.trim(),
         analysis: analysisResult,
         improvedAd: analysisResult!.improvedAdBrief,
