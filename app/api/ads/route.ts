@@ -31,11 +31,11 @@ export async function POST(req: NextRequest) {
     const json = await res.json();
 
     if (json.error) {
-      return NextResponse.json({ error: json.error.message ?? "Meta API error", ads: [] }, { status: 200 });
+      return NextResponse.json({ error: `Meta API: ${json.error.message ?? JSON.stringify(json.error)}`, ads: [] }, { status: 200 });
     }
 
     const ads = (json.data ?? []).slice(0, 5);
-    return NextResponse.json({ ads });
+    return NextResponse.json({ ads, debug: { searchTerm: companyName, total: json.data?.length ?? 0 } });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message, ads: [] }, { status: 200 });

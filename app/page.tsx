@@ -216,7 +216,8 @@ export default function WorkflowPage() {
     setStep("ads", "running");
     let foundAds: Ad[] = [];
     try {
-      const data = await post<{ ads: Ad[] }>("/api/ads", { companyName: nameForSearch });
+      const data = await post<{ ads: Ad[]; error?: string; debug?: unknown }>("/api/ads", { companyName: nameForSearch });
+      if (data.error) throw new Error(data.error);
       foundAds = data.ads ?? [];
       setAds(foundAds);
       setStep("ads", "done");
