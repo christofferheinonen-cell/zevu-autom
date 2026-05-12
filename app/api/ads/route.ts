@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       waitFor: 4000,
     });
 
-    if (!result.success || !result.markdown) {
+    if (!result.markdown) {
       return NextResponse.json({ ads: [], error: "Could not load Meta Ad Library page" }, { status: 200 });
     }
 
