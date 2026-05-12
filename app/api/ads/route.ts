@@ -1,54 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FirecrawlClient } from "@mendable/firecrawl-js";
+
+const META_API_BASE = "https://graph.facebook.com/v21.0/ads_archive";
 
 export async function POST(req: NextRequest) {
   try {
-    const { companyName } = await req.json();
+    const { companyName, pageId } = await req.json();
     if (!companyName || typeof companyName !== "string") {
       return NextResponse.json({ error: "companyName is required" }, { status: 400 });
     }
 
-    const apiKey = process.env.FIRECRAWL_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: "FIRECRAWL_API_KEY not configured" }, { status: 500 });
+    const token = process.env.META_ACCESS_TOKEN;
+    if (!token) {
+      return NextResponse.json({ ads: [] }, { status: 200 });
     }
 
-    const client = new FirecrawlClient({ apiKey });
-
-    const libraryUrl = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=FI&q=${encodeURIComponent(companyName)}&search_type=keyword_unordered`;
-
-    const result = await client.scrape(libraryUrl, {
-      formats: ["markdown"],
-      waitFor: 4000,
+    const params = new URLSearchParams({
+      search_terms: companyName,
+      ad_reached_countries: JSON.stringify(["FI"]),
+      ad_active_status: "ALL",
+      fields: "ad_creative_body,ad_creative_link_title,ad_snapshot_url,impressions,page_name",
+      limit: "10",
+      access_token: token,
     });
 
-    if (!result.markdown) {
-      return NextResponse.json({ ads: [], error: "Could not load Meta Ad Library page" }, { status: 200 });
+    if (pageId) {
+      params.set("search_page_ids", JSON.stringify([pageId]));
     }
 
-    // Extract ad blocks from the scraped markdown
-    const markdown = result.markdown;
-    const ads: { page_name?: string; ad_creative_body?: string; ad_creative_link_title?: string }[] = [];
+    const res = await fetch(`${META_API_BASE}?${params.toString()}`);
+    const json = await res.json();
 
-    // Look for sponsored content patterns in the scraped text
-    const lines = markdown.split("\n").filter(l => l.trim());
-    let currentAd: typeof ads[0] = {};
-
-    for (const line of lines) {
-      if (line.toLowerCase().includes("sponsoroitu") || line.toLowerCase().includes("sponsored")) {
-        if (currentAd.page_name) ads.push(currentAd);
-        currentAd = {};
-      } else if (!currentAd.page_name && line.length > 2 && line.length < 80 && !line.startsWith("http")) {
-        currentAd.page_name = line.replace(/^#+\s*/, "").trim();
-      } else if (currentAd.page_name && !currentAd.ad_creative_body && line.length > 20) {
-        currentAd.ad_creative_body = line.trim();
-      }
+    if (json.error) {
+      // Return empty ads silently — analysis continues with website-only data
+      return NextResponse.json({ ads: [] }, { status: 200 });
     }
-    if (currentAd.page_name) ads.push(currentAd);
 
-    return NextResponse.json({ ads: ads.slice(0, 5) });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message, ads: [] }, { status: 200 });
+    const ads = (json.data ?? []).slice(0, 5);
+    return NextResponse.json({ ads });
+  } catch {
+    return NextResponse.json({ ads: [] }, { status: 200 });
   }
 }
