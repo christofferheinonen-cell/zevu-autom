@@ -22,15 +22,16 @@ export async function POST(req: NextRequest) {
 
 Prospect company: ${companyName}
 Website: ${url}
-Key weakness found: ${topWeakness}
-Biggest opportunity: ${opportunity}
-Improved ad headline we built: "${improvedAd?.headline ?? ""}"
+Meta ads weakness: ${topWeakness}
+Biggest Meta ads opportunity: ${opportunity}
+Ad concept headline we built for them: "${improvedAd?.headline ?? ""}"
 
 Rules:
 - Under 130 words total
 - Sharp and direct — no fluff, no "I hope this email finds you well"
-- Reference the specific weakness found (make it clear we looked at their actual ads/site)
-- Mention we built a free ad concept for them
+- The angle is their META ADS specifically — either they're not running ads, or their ads are weak
+- Make it clear we actually looked at their Meta ad presence (or absence)
+- Mention we built a free ad concept specifically for them
 - Natural Finnish/Nordic directness — no American-style hype
 - Sign off as Christoffer from Zevu
 - Return ONLY valid JSON: {"subject": "string", "body": "string"}
