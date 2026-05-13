@@ -26,6 +26,14 @@ interface Analysis {
   };
 }
 
+interface AdConcept {
+  headline: string;
+  subheadline: string;
+  primaryText: string;
+  cta: string;
+  geminiPrompt: string;
+}
+
 interface Email {
   subject: string;
   body: string;
@@ -37,6 +45,7 @@ interface StepState {
   scrape: StepStatus;
   ads: StepStatus;
   analyze: StepStatus;
+  concept: StepStatus;
   image: StepStatus;
   email: StepStatus;
 }
@@ -45,9 +54,10 @@ interface StepState {
 const STEPS = [
   { key: "scrape", num: "1", title: "Verkkosivuston skannaus", desc: "Firecrawl kerää sivuston sisällön" },
   { key: "ads", num: "2", title: "Meta-mainokset haetaan", desc: "Meta Ad Library API" },
-  { key: "analyze", num: "3", title: "Heikkoudet analysoidaan", desc: "Claude analysoi mainostrategian" },
-  { key: "image", num: "4", title: "Kuva generoidaan", desc: "Gemini luo mainosvisuaalin" },
-  { key: "email", num: "5", title: "Valmis", desc: "Sähköpostiluonnos on valmis" },
+  { key: "analyze", num: "3", title: "Heikkoudet analysoidaan", desc: "GPT-4o analysoi mainostrategian" },
+  { key: "concept", num: "4", title: "Mainos luodaan", desc: "GPT-4o rakentaa uuden mainoskonseptin" },
+  { key: "image", num: "5", title: "Kuva generoidaan", desc: "Gemini luo mainosvisuaalin" },
+  { key: "email", num: "6", title: "Valmis", desc: "Sähköpostiluonnos on valmis" },
 ] as const;
 
 type StepKey = typeof STEPS[number]["key"];
@@ -144,7 +154,7 @@ export default function WorkflowPage() {
   const [copied, setCopied] = useState(false);
 
   const [steps, setSteps] = useState<StepState>({
-    scrape: "pending", ads: "pending", analyze: "pending", image: "pending", email: "pending",
+    scrape: "pending", ads: "pending", analyze: "pending", concept: "pending", image: "pending", email: "pending",
   });
   const [errors, setErrors] = useState<Partial<Record<StepKey, string>>>({});
   const [adsDebug, setAdsDebug] = useState<unknown>(null);
@@ -152,6 +162,7 @@ export default function WorkflowPage() {
   const [scrapedContent, setScrapedContent] = useState<string | null>(null);
   const [ads, setAds] = useState<Ad[] | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [concept, setConcept] = useState<AdConcept | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [email, setEmail] = useState<Email | null>(null);
 
@@ -184,9 +195,10 @@ export default function WorkflowPage() {
     setScrapedContent(null);
     setAds(null);
     setAnalysis(null);
+    setConcept(null);
     setImageUrl(null);
     setEmail(null);
-    setSteps({ scrape: "pending", ads: "pending", analyze: "pending", image: "pending", email: "pending" });
+    setSteps({ scrape: "pending", ads: "pending", analyze: "pending", concept: "pending", image: "pending", email: "pending" });
 
     /* Step 1 — Scrape */
     setStep("scrape", "running");
@@ -240,12 +252,29 @@ export default function WorkflowPage() {
       return;
     }
 
-    /* Step 4 — Generate image */
+    /* Step 4 — Generate ad concept */
+    setStep("concept", "running");
+    let conceptResult: AdConcept | null = null;
+    try {
+      const data = await post<AdConcept>("/api/generate-ad", {
+        companyName: companyName.trim() || nameForSearch,
+        analysis: analysisResult,
+      });
+      conceptResult = data;
+      setConcept(data);
+      setStep("concept", "done");
+    } catch (e) {
+      setError("concept", (e as Error).message);
+      setRunning(false);
+      return;
+    }
+
+    /* Step 5 — Generate image */
     setStep("image", "running");
     let generatedImage: string | null = null;
     try {
       const data = await post<{ imageUrl: string | null }>("/api/generate-image", {
-        visualPrompt: analysisResult!.improvedAdBrief.visualPrompt,
+        visualPrompt: conceptResult!.geminiPrompt,
       });
       generatedImage = data.imageUrl;
       setImageUrl(generatedImage);
@@ -255,14 +284,14 @@ export default function WorkflowPage() {
       /* non-fatal — show text-only concept */
     }
 
-    /* Step 5 — Draft email */
+    /* Step 6 — Draft email */
     setStep("email", "running");
     try {
       const data = await post<Email>("/api/draft-email", {
         companyName: companyName.trim() || nameForSearch,
         url: url.trim(),
         analysis: analysisResult,
-        improvedAd: analysisResult!.improvedAdBrief,
+        improvedAd: conceptResult,
       });
       setEmail(data);
       setStep("email", "done");
@@ -280,7 +309,7 @@ export default function WorkflowPage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const hasResults = !!(scrapedContent || ads !== null || analysis || email);
+  const hasResults = !!(scrapedContent || ads !== null || analysis || concept || email);
   const isDone = steps.email === "done";
 
   return (
@@ -529,48 +558,60 @@ export default function WorkflowPage() {
                   </div>
                 )}
 
-                {/* Improved ad concept */}
-                {(analysis || steps.image === "running" || steps.image === "done") && analysis?.improvedAdBrief && (
+                {/* Ad concept */}
+                {(concept || steps.concept === "running" || steps.image === "running" || steps.image === "done") && (
                   <div className="result-block">
                     <div className="result-block-header">
                       <div className="result-block-title">
                         <div className="result-block-icon">✨</div>
-                        Parannettu mainoskonsepti
+                        Uusi mainoskonsepti
                       </div>
+                      {steps.concept === "running" && <span className="badge badge-neutral"><span className="spinner" /> Luodaan…</span>}
                       {steps.image === "done" && <span className="badge badge-success">✓ Kuva generoitu</span>}
-                      {steps.image === "running" && <span className="badge badge-neutral"><span className="spinner" /> Generoidaan…</span>}
+                      {steps.image === "running" && <span className="badge badge-neutral"><span className="spinner" /> Generoidaan kuvaa…</span>}
                       {steps.image === "error" && <span className="badge badge-warning">Vain teksti</span>}
                     </div>
-                    <div className="result-block-body">
-                      <div className="concept-card">
-                        <div className="concept-image-area">
-                          {steps.image === "running" && (
-                            <div className="concept-image-placeholder">
-                              <div className="concept-image-placeholder-icon">🎨</div>
-                              <div className="concept-image-placeholder-text">Gemini generoi kuvaa…</div>
-                            </div>
-                          )}
-                          {imageUrl && steps.image === "done" && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={imageUrl} alt="Generated ad visual" />
-                          )}
-                          {!imageUrl && steps.image !== "running" && (
-                            <div className="concept-image-placeholder">
-                              <div className="concept-image-placeholder-icon">🖼</div>
-                              <div className="concept-image-placeholder-text">
-                                {analysis.improvedAdBrief.visualPrompt}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="concept-content">
-                          <div className="concept-headline">{analysis.improvedAdBrief.headline}</div>
-                          <div className="concept-subheadline">{analysis.improvedAdBrief.subheadline}</div>
-                          <div className="concept-body-text">{analysis.improvedAdBrief.bodyText}</div>
-                          <div className="concept-cta-btn">{analysis.improvedAdBrief.cta} →</div>
+                    {steps.concept === "running" && (
+                      <div className="result-block-body">
+                        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                          {[100, 75, 90, 60].map((w, i) => (
+                            <div key={i} className="skeleton" style={{ height: 14, width: `${w}%` }} />
+                          ))}
                         </div>
                       </div>
-                    </div>
+                    )}
+                    {concept && (
+                      <div className="result-block-body">
+                        <div className="concept-card">
+                          <div className="concept-image-area">
+                            {steps.image === "running" && (
+                              <div className="concept-image-placeholder">
+                                <div className="concept-image-placeholder-icon">🎨</div>
+                                <div className="concept-image-placeholder-text">Gemini generoi kuvaa…</div>
+                              </div>
+                            )}
+                            {imageUrl && steps.image === "done" && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={imageUrl} alt="Generated ad visual" />
+                            )}
+                            {!imageUrl && steps.image !== "running" && (
+                              <div className="concept-image-placeholder">
+                                <div className="concept-image-placeholder-icon">🖼</div>
+                                <div className="concept-image-placeholder-text" style={{ fontStyle: "italic", fontSize: "var(--text-xs)" }}>
+                                  {concept.geminiPrompt}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="concept-content">
+                            <div className="concept-headline">{concept.headline}</div>
+                            <div className="concept-subheadline">{concept.subheadline}</div>
+                            <div className="concept-body-text" style={{ whiteSpace: "pre-wrap" }}>{concept.primaryText}</div>
+                            <div className="concept-cta-btn">{concept.cta} →</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
