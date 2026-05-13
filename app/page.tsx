@@ -115,20 +115,12 @@ function AdCard({ ad, index }: { ad: Ad; index: number }) {
         </div>
       </div>
       {ad.ad_creative_bodies?.[0] && (
-        <div className="ad-card-body-text">{ad.ad_creative_bodies[0]}</div>
+        <div className="ad-card-body-text" style={{ whiteSpace: "pre-wrap" }}>{ad.ad_creative_bodies[0]}</div>
       )}
       {ad.ad_snapshot_url && (
-        <div className="ad-card-image" style={{ padding: 0, overflow: "hidden", borderRadius: "var(--radius-md)", background: "#f0f0f0" }}>
-          <iframe
-            src={ad.ad_snapshot_url}
-            style={{ width: "100%", height: 320, border: "none", display: "block" }}
-            scrolling="no"
-            title="Ad preview"
-          />
-          <a href={ad.ad_snapshot_url} target="_blank" rel="noopener noreferrer" style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--primary)", padding: "6px 10px" }}>
-            Avaa Metassa →
-          </a>
-        </div>
+        <a href={ad.ad_snapshot_url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-block", marginTop: 8, fontSize: "var(--text-xs)", color: "var(--primary)", fontWeight: 600 }}>
+          Katso mainos Metassa →
+        </a>
       )}
       <div className="ad-card-footer">
         <span className="ad-card-link-title">{ad.ad_creative_link_titles?.[0] ?? "Lue lisää"}</span>
