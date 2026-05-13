@@ -151,6 +151,7 @@ export default function WorkflowPage() {
     scrape: "pending", ads: "pending", analyze: "pending", image: "pending", email: "pending",
   });
   const [errors, setErrors] = useState<Partial<Record<StepKey, string>>>({});
+  const [adsDebug, setAdsDebug] = useState<unknown>(null);
 
   const [scrapedContent, setScrapedContent] = useState<string | null>(null);
   const [ads, setAds] = useState<Ad[] | null>(null);
@@ -218,7 +219,7 @@ export default function WorkflowPage() {
     let foundAds: Ad[] = [];
     try {
       const data = await post<{ ads: Ad[]; error?: string; debug?: unknown }>("/api/ads", { companyName: nameForSearch });
-      console.log("[ads debug]", data.debug);
+      setAdsDebug(data.debug ?? data.error ?? "no debug info");
       if (data.error) throw new Error(data.error);
       foundAds = data.ads ?? [];
       setAds(foundAds);
@@ -448,13 +449,20 @@ export default function WorkflowPage() {
                         </div>
                       )}
                       {ads !== null && ads.length === 0 && steps.ads !== "running" && (
-                        <div className="alert alert-warning">
-                          <span>⚠️</span>
-                          <div>
-                            <strong>Ei aktiivisia Meta-mainoksia löydetty.</strong>{" "}
-                            Analyysi jatkuu pelkän verkkosivuston perusteella — tämä voi itsessään olla merkittävä mahdollisuus.
+                        <>
+                          <div className="alert alert-warning">
+                            <span>⚠️</span>
+                            <div>
+                              <strong>Ei aktiivisia Meta-mainoksia löydetty.</strong>{" "}
+                              Analyysi jatkuu pelkän verkkosivuston perusteella — tämä voi itsessään olla merkittävä mahdollisuus.
+                            </div>
                           </div>
-                        </div>
+                          {adsDebug && (
+                            <pre style={{ fontSize: 11, background: "#f4f4f4", padding: 8, borderRadius: 6, overflow: "auto", marginTop: 8, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                              {JSON.stringify(adsDebug, null, 2)}
+                            </pre>
+                          )}
+                        </>
                       )}
                       {ads && ads.length > 0 && (
                         <div className="ads-grid">
