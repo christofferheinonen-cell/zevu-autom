@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { FirecrawlClient } from "@mendable/firecrawl-js";
 
 const SYSTEM = `You are an expert Meta (Facebook/Instagram) ads strategist working for Zevu, a Finnish ads agency.
 Your job is to identify weaknesses in a prospect's Meta ad strategy so Zevu can pitch them better ads.
@@ -20,6 +21,30 @@ const SCHEMA = `{
   }
 }`;
 
+async function screenshotAds(
+  ads: { ad_snapshot_url?: string }[],
+  firecrawlKey: string
+): Promise<string[]> {
+  const client = new FirecrawlClient({ apiKey: firecrawlKey });
+  const urls = ads
+    .map(a => a.ad_snapshot_url)
+    .filter((u): u is string => !!u)
+    .slice(0, 3);
+
+  const screenshots: string[] = [];
+  await Promise.all(
+    urls.map(async url => {
+      try {
+        const result = await client.scrape(url, { formats: ["screenshot"], waitFor: 3000 });
+        if (result.screenshot) screenshots.push(result.screenshot);
+      } catch {
+        // skip failed screenshots
+      }
+    })
+  );
+  return screenshots;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { scrapedContent, ads } = await req.json();
@@ -33,6 +58,12 @@ export async function POST(req: NextRequest) {
     }
 
     const client = new OpenAI({ apiKey });
+
+    // Screenshot ad creatives for visual analysis
+    const firecrawlKey = process.env.FIRECRAWL_API_KEY;
+    const screenshots: string[] = firecrawlKey && ads?.length > 0
+      ? await screenshotAds(ads, firecrawlKey)
+      : [];
 
     const adsSection = ads && ads.length > 0
       ? `\n\nACTIVE META ADS FOUND (${ads.length}):\n${JSON.stringify(ads, null, 2)}`
@@ -48,18 +79,27 @@ Focus on:
 Website (for context on their product/brand):
 ${scrapedContent.slice(0, 6000)}
 ${adsSection}
+${screenshots.length > 0 ? `\n\nAd creative screenshots are attached as images — analyse the visual design, imagery, and layout too.` : ""}
 
 Return analysis as JSON matching this exact schema:
 ${SCHEMA}
 
 Write ALL values in Finnish. Return ONLY the JSON object, nothing else.`;
 
+    const userContent: OpenAI.Chat.ChatCompletionContentPart[] = [
+      { type: "text", text: prompt },
+      ...screenshots.map(url => ({
+        type: "image_url" as const,
+        image_url: { url, detail: "low" as const },
+      })),
+    ];
+
     const message = await client.chat.completions.create({
       model: "gpt-4o",
       max_tokens: 1024,
       messages: [
         { role: "system", content: SYSTEM },
-        { role: "user", content: prompt },
+        { role: "user", content: userContent },
       ],
     });
 
