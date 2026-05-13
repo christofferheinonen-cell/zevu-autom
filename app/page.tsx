@@ -119,8 +119,9 @@ function AdCard({ ad, index }: { ad: Ad; index: number }) {
       )}
       <div className="ad-card-image">
         {ad.ad_snapshot_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={ad.ad_snapshot_url} alt="Ad preview" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          <a href={ad.ad_snapshot_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: "var(--text-xs)", color: "var(--primary)" }}>
+            Katso mainos Metassa →
+          </a>
         ) : (
           <span style={{ color: "var(--text-muted)", fontSize: "var(--text-xs)" }}>Esikatselua ei saatavilla</span>
         )}

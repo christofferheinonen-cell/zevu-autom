@@ -18,8 +18,8 @@ export async function POST(req: NextRequest) {
       search_terms: companyName,
       ad_reached_countries: JSON.stringify(["FI"]),
       ad_active_status: "ALL",
-      fields: "ad_creative_body,ad_creative_link_title,ad_snapshot_url,impressions,page_name",
-      limit: "10",
+      fields: "ad_creative_body,ad_creative_link_title,ad_snapshot_url,impressions,page_name,page_id",
+      limit: "25",
       access_token: token,
     });
 
@@ -31,11 +31,18 @@ export async function POST(req: NextRequest) {
     const json = await res.json();
 
     if (json.error) {
-      // Return empty ads silently — analysis continues with website-only data
       return NextResponse.json({ ads: [] }, { status: 200 });
     }
 
-    const ads = (json.data ?? []).slice(0, 5);
+    // Filter to ads where page_name closely matches the search term
+    const needle = companyName.toLowerCase();
+    const all: { page_name?: string }[] = json.data ?? [];
+    const filtered = all.filter(ad =>
+      ad.page_name && ad.page_name.toLowerCase().includes(needle)
+    );
+
+    // Fall back to all results if no close match found
+    const ads = (filtered.length > 0 ? filtered : all).slice(0, 5);
     return NextResponse.json({ ads });
   } catch {
     return NextResponse.json({ ads: [] }, { status: 200 });
