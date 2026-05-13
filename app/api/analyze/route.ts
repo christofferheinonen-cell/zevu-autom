@@ -3,7 +3,7 @@ import OpenAI from "openai";
 
 const SYSTEM = `You are an expert Meta (Facebook/Instagram) ads strategist working for Zevu, a Finnish ads agency.
 Your job is to identify weaknesses in a prospect's Meta ad strategy so Zevu can pitch them better ads.
-Return ONLY valid JSON — no markdown, no code fences.`;
+You MUST write ALL text fields in Finnish. Return ONLY valid JSON — no markdown, no code fences.`;
 
 const SCHEMA = `{
   "targetAudience": "string — 1-2 sentences describing who they should be targeting",
@@ -52,7 +52,7 @@ ${adsSection}
 Return analysis as JSON matching this exact schema:
 ${SCHEMA}
 
-Return ONLY the JSON object, nothing else.`;
+Write ALL values in Finnish. Return ONLY the JSON object, nothing else.`;
 
     const message = await client.chat.completions.create({
       model: "gpt-4o",

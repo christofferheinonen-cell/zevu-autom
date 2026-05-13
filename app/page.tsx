@@ -117,15 +117,19 @@ function AdCard({ ad, index }: { ad: Ad; index: number }) {
       {ad.ad_creative_bodies?.[0] && (
         <div className="ad-card-body-text">{ad.ad_creative_bodies[0]}</div>
       )}
-      <div className="ad-card-image">
-        {ad.ad_snapshot_url ? (
-          <a href={ad.ad_snapshot_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: "var(--text-xs)", color: "var(--primary)" }}>
-            Katso mainos Metassa →
+      {ad.ad_snapshot_url && (
+        <div className="ad-card-image" style={{ padding: 0, overflow: "hidden", borderRadius: "var(--radius-md)", background: "#f0f0f0" }}>
+          <iframe
+            src={ad.ad_snapshot_url}
+            style={{ width: "100%", height: 320, border: "none", display: "block" }}
+            scrolling="no"
+            title="Ad preview"
+          />
+          <a href={ad.ad_snapshot_url} target="_blank" rel="noopener noreferrer" style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--primary)", padding: "6px 10px" }}>
+            Avaa Metassa →
           </a>
-        ) : (
-          <span style={{ color: "var(--text-muted)", fontSize: "var(--text-xs)" }}>Esikatselua ei saatavilla</span>
-        )}
-      </div>
+        </div>
+      )}
       <div className="ad-card-footer">
         <span className="ad-card-link-title">{ad.ad_creative_link_titles?.[0] ?? "Lue lisää"}</span>
         <span className="ad-card-cta-btn">Lue lisää</span>
