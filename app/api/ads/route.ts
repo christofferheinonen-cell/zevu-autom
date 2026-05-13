@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       search_terms: companyName,
       ad_reached_countries: JSON.stringify(["FI"]),
       ad_active_status: "ALL",
-      fields: "ad_creative_body,ad_creative_link_title,ad_snapshot_url,impressions,page_name,page_id",
+      fields: "ad_creative_bodies,ad_creative_link_titles,ad_snapshot_url,impressions,page_name,page_id",
       limit: "25",
       access_token: token,
     });

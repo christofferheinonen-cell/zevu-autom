@@ -4,8 +4,8 @@ import { useState, useCallback } from "react";
 
 /* ── Types ── */
 interface Ad {
-  ad_creative_body?: string;
-  ad_creative_link_title?: string;
+  ad_creative_bodies?: string[];
+  ad_creative_link_titles?: string[];
   ad_snapshot_url?: string;
   impressions?: { lower_bound?: string; upper_bound?: string };
   page_name?: string;
@@ -114,8 +114,8 @@ function AdCard({ ad, index }: { ad: Ad; index: number }) {
           </div>
         </div>
       </div>
-      {ad.ad_creative_body && (
-        <div className="ad-card-body-text">{ad.ad_creative_body}</div>
+      {ad.ad_creative_bodies?.[0] && (
+        <div className="ad-card-body-text">{ad.ad_creative_bodies[0]}</div>
       )}
       <div className="ad-card-image">
         {ad.ad_snapshot_url ? (
@@ -127,7 +127,7 @@ function AdCard({ ad, index }: { ad: Ad; index: number }) {
         )}
       </div>
       <div className="ad-card-footer">
-        <span className="ad-card-link-title">{ad.ad_creative_link_title ?? "Lue lisää"}</span>
+        <span className="ad-card-link-title">{ad.ad_creative_link_titles?.[0] ?? "Lue lisää"}</span>
         <span className="ad-card-cta-btn">Lue lisää</span>
       </div>
       {impressionText && (
