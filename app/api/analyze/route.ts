@@ -1,25 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
+import { FirecrawlClient } from "@mendable/firecrawl-js";
 
-const client = new Anthropic();
-
-const SYSTEM = `You are an expert digital advertising strategist specializing in Meta (Facebook/Instagram) ads.
-Analyze the provided website content and ad data, then return ONLY valid JSON — no markdown, no code fences.`;
+const SYSTEM = `You are an expert Meta (Facebook/Instagram) ads strategist working for Zevu, a Finnish ads agency.
+Your job is to identify weaknesses in a prospect's Meta ad strategy so Zevu can pitch them better ads.
+You MUST write ALL text fields in Finnish. Return ONLY valid JSON — no markdown, no code fences.`;
 
 const SCHEMA = `{
-  "targetAudience": "string — 1-2 sentences describing the likely target audience",
-  "keyBenefits": ["string", "..."],
-  "brandTone": "string — brief characterization of brand voice",
-  "topWeaknesses": ["string — specific, actionable weakness", "..."],
-  "biggestOpportunity": "string — the single highest-impact improvement opportunity",
+  "targetAudience": "string — 1-2 sentences describing who they should be targeting",
+  "keyBenefits": ["string — benefits they have but aren't communicating well in ads", "..."],
+  "brandTone": "string — how their current brand/ads come across",
+  "topWeaknesses": ["string — specific weakness in their Meta ad strategy or absence of ads", "..."],
+  "biggestOpportunity": "string — the single highest-impact Meta ads opportunity for this company",
   "improvedAdBrief": {
-    "headline": "string — punchy, max 8 words",
+    "headline": "string — punchy Meta ad headline, max 8 words",
     "subheadline": "string — supporting line, max 15 words",
-    "bodyText": "string — 1-2 sentences of ad copy",
+    "bodyText": "string — 1-2 sentences of Meta ad copy",
     "cta": "string — call-to-action button text, max 4 words",
     "visualPrompt": "string — detailed prompt for AI image generation"
   }
 }`;
+
+async function screenshotAds(
+  ads: { ad_snapshot_url?: string }[],
+  firecrawlKey: string
+): Promise<string[]> {
+  const client = new FirecrawlClient({ apiKey: firecrawlKey });
+  const urls = ads
+    .map(a => a.ad_snapshot_url)
+    .filter((u): u is string => !!u)
+    .slice(0, 3);
+
+  const screenshots: string[] = [];
+  await Promise.all(
+    urls.map(async url => {
+      try {
+        const result = await client.scrape(url, { formats: ["screenshot"], waitFor: 3000 });
+        if (result.screenshot) screenshots.push(result.screenshot);
+      } catch {
+        // skip failed screenshots
+      }
+    })
+  );
+  return screenshots;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,37 +52,58 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "scrapedContent is required" }, { status: 400 });
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
+      return NextResponse.json({ error: "OPENAI_API_KEY not configured" }, { status: 500 });
     }
 
+    const client = new OpenAI({ apiKey });
+
+    // Screenshot ad creatives for visual analysis
+    const firecrawlKey = process.env.FIRECRAWL_API_KEY;
+    const screenshots: string[] = firecrawlKey && ads?.length > 0
+      ? await screenshotAds(ads, firecrawlKey)
+      : [];
+
     const adsSection = ads && ads.length > 0
-      ? `\n\nCurrent Meta ads found (${ads.length}):\n${JSON.stringify(ads, null, 2)}`
-      : "\n\nNo Meta ads found for this company — analyse based on website only.";
+      ? `\n\nACTIVE META ADS FOUND (${ads.length}):\n${JSON.stringify(ads, null, 2)}`
+      : "\n\nNO META ADS FOUND — this company has no visible Meta ads running. This is itself a major weakness and opportunity.";
 
-    const prompt = `Analyse this company's digital advertising presence.
+    const prompt = `Analyse this company's Meta advertising strategy. Your goal is to identify weaknesses in their paid social approach so we can pitch them better ads.
 
-Website content:
-${scrapedContent.slice(0, 8000)}
+Focus on:
+- Are they running Meta ads? If not, why is that a missed opportunity?
+- If they are running ads: what's weak about the creative, targeting, messaging, or offer?
+- What would a high-converting Meta ad look like for this company?
+
+Website (for context on their product/brand):
+${scrapedContent.slice(0, 6000)}
 ${adsSection}
+${screenshots.length > 0 ? `\n\nAd creative screenshots are attached as images — analyse the visual design, imagery, and layout too.` : ""}
 
 Return analysis as JSON matching this exact schema:
 ${SCHEMA}
 
-Return ONLY the JSON object, nothing else.`;
+Write ALL values in Finnish. Return ONLY the JSON object, nothing else.`;
 
-    const message = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+    const userContent: OpenAI.Chat.ChatCompletionContentPart[] = [
+      { type: "text", text: prompt },
+      ...screenshots.map(url => ({
+        type: "image_url" as const,
+        image_url: { url, detail: "low" as const },
+      })),
+    ];
+
+    const message = await client.chat.completions.create({
+      model: "gpt-4o",
       max_tokens: 1024,
-      system: SYSTEM,
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        { role: "system", content: SYSTEM },
+        { role: "user", content: userContent },
+      ],
     });
 
-    const text = message.content
-      .filter(b => b.type === "text")
-      .map(b => (b as { type: "text"; text: string }).text)
-      .join("");
+    const text = message.choices[0]?.message?.content ?? "";
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
