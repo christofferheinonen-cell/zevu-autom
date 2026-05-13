@@ -218,6 +218,7 @@ export default function WorkflowPage() {
     let foundAds: Ad[] = [];
     try {
       const data = await post<{ ads: Ad[]; error?: string; debug?: unknown }>("/api/ads", { companyName: nameForSearch });
+      console.log("[ads debug]", data.debug);
       if (data.error) throw new Error(data.error);
       foundAds = data.ads ?? [];
       setAds(foundAds);

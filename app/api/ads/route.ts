@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     const json = await res.json();
 
     if (json.error) {
-      return NextResponse.json({ ads: [] }, { status: 200 });
+      return NextResponse.json({ ads: [], debug: { error: json.error, searchTerm: companyName } }, { status: 200 });
     }
 
     // Filter to ads where page_name closely matches the search term
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     // Fall back to all results if no close match found
     const ads = (filtered.length > 0 ? filtered : all).slice(0, 5);
-    return NextResponse.json({ ads });
+    return NextResponse.json({ ads, debug: { total: all.length, filtered: filtered.length, searchTerm: companyName, pageNames: all.map((a: { page_name?: string }) => a.page_name) } });
   } catch {
     return NextResponse.json({ ads: [] }, { status: 200 });
   }
