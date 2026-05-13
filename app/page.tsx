@@ -365,8 +365,9 @@ export default function WorkflowPage() {
                       <div className="step-desc">{step.desc}</div>
                       <StatusPill status={steps[step.key as StepKey]} />
                       {errors[step.key as StepKey] && (
-                        <div style={{ fontSize: "var(--text-xs)", color: "var(--error)", marginTop: "var(--space-1)", lineHeight: 1.5 }}>
-                          {errors[step.key as StepKey]}
+                        <div style={{ fontSize: "var(--text-xs)", color: "var(--error)", marginTop: "var(--space-1)", lineHeight: 1.5, display: "flex", alignItems: "flex-start", gap: 6 }}>
+                          <span style={{ flex: 1 }}>{errors[step.key as StepKey]}</span>
+                          <button onClick={() => setErrors(prev => { const n = {...prev}; delete n[step.key as StepKey]; return n; })} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--error)", fontWeight: 700, fontSize: 14, lineHeight: 1, padding: 0, flexShrink: 0 }}>✕</button>
                         </div>
                       )}
                     </div>
